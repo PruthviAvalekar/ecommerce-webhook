@@ -4,9 +4,9 @@ const app = express();
 
 app.use(bodyParser.json());
 
-// -----------------------------------------------
+// -------------------------------------------------
 // PRODUCT DATABASE (EXTENDED)
-// -----------------------------------------------
+// -------------------------------------------------
 const products = [
   // Mobiles
   {
@@ -135,14 +135,15 @@ const products = [
   },
 ];
 
-// -----------------------------------------------
+// -------------------------------------------------
 // CATEGORY NORMALIZATION (BASED ON YOUR ENTITY)
-// -----------------------------------------------
+// -------------------------------------------------
 const CATEGORY_MAP = {
   mobile: ["phone", "phones", "mobile", "mobiles", "smartphone", "smartphones"],
   laptop: ["laptop", "laptops", "pc", "pcs", "notebook", "notebooks"],
   headphones: [
     "headphones",
+    "headphone",
     "earphones",
     "headset",
     "headsets",
@@ -164,43 +165,57 @@ const CATEGORY_MAP = {
   camera: ["camera", "cameras", "dslr", "dslrs", "cam", "cams"],
 };
 
+// -------------------------------------------------
+// NORMALIZATION HELPERS
+// -------------------------------------------------
 function normalizeCategory(cat) {
   if (!cat) return "";
 
-  cat = cat.toLowerCase();
+  cat = cat.toLowerCase().trim();
 
+  // direct match inside map
   for (const key in CATEGORY_MAP) {
     if (CATEGORY_MAP[key].includes(cat)) {
       return key;
     }
   }
 
-  return cat; // fallback if new category added
+  // plural to singular (e.g., smartwatches → smartwatch)
+  if (cat.endsWith("s")) {
+    const singular = cat.slice(0, -1);
+    for (const key in CATEGORY_MAP) {
+      if (CATEGORY_MAP[key].includes(singular)) {
+        return key;
+      }
+    }
+  }
+
+  return cat; // fallback
 }
 
-function normalizeBrand(br) {
-  if (!br) return "";
-  return br.toLowerCase();
+function normalizeBrand(brand) {
+  if (!brand) return "";
+  return brand.toLowerCase().trim();
 }
 
 function normalizeFeature(f) {
   if (!f) return "";
-  return f.toLowerCase();
+  return f.toLowerCase().trim();
 }
 
-// -----------------------------------------------
+// -------------------------------------------------
 // PRODUCT FILTER FUNCTION
-// -----------------------------------------------
+// -------------------------------------------------
 function filterProducts(parameters) {
   let { brand, category, price, features } = parameters;
 
-  // unwrap arrays from Dialogflow
+  // unwrap arrays
   brand = brand?.[0] || "";
   category = category?.[0] || "";
   price = price?.[0] || "";
   features = features?.[0] || "";
 
-  // Normalize
+  // Normalize values
   category = normalizeCategory(category);
   brand = normalizeBrand(brand);
   features = normalizeFeature(features);
@@ -208,17 +223,14 @@ function filterProducts(parameters) {
   let results = products;
 
   if (category) {
-    results = results.filter((p) => p.category.toLowerCase() === category);
+    results = results.filter((p) => p.category === category);
   }
-
   if (brand) {
     results = results.filter((p) => p.brand.toLowerCase() === brand);
   }
-
   if (price) {
     results = results.filter((p) => p.price <= parseInt(price));
   }
-
   if (features) {
     results = results.filter((p) =>
       p.features.map((x) => x.toLowerCase()).includes(features)
@@ -228,9 +240,9 @@ function filterProducts(parameters) {
   return results;
 }
 
-// -----------------------------------------------
+// -------------------------------------------------
 // MAIN WEBHOOK ENDPOINT
-// -----------------------------------------------
+// -------------------------------------------------
 app.post("/webhook", (req, res) => {
   const intentName = req.body.queryResult.intent.displayName;
   const parameters = req.body.queryResult.parameters;
@@ -257,8 +269,12 @@ app.post("/webhook", (req, res) => {
     });
   }
 
-  return res.json({ fulfillmentText: "I'm not sure how to handle that." });
+  return res.json({
+    fulfillmentText: "I'm not sure how to handle that.",
+  });
 });
 
-// -----------------------------------------------
-app.listen(3000, () => console.log("Webhook server running on port 3000"));
+// -------------------------------------------------
+app.listen(3000, () => {
+  console.log("Webhook server running on port 3000");
+});
