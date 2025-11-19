@@ -53,22 +53,27 @@ const products = [
 ];
 
 // ---------------------------
-// FUNCTION TO FILTER PRODUCTS
+// FIXED PRODUCT FILTER FUNCTION
 // ---------------------------
 function filterProducts(parameters) {
   let { brand, category, price, features } = parameters;
 
+  // Dialogflow returns arrays → convert them to single values
+  if (Array.isArray(brand)) brand = brand[0];
+  if (Array.isArray(category)) category = category[0];
+  if (Array.isArray(features)) features = features[0];
+
   let results = products;
 
   // Filter by category
-  if (category) {
+  if (category && category !== "") {
     results = results.filter(
       (p) => p.category.toLowerCase() === category.toLowerCase()
     );
   }
 
   // Filter by brand
-  if (brand) {
+  if (brand && brand !== "") {
     results = results.filter(
       (p) => p.brand.toLowerCase() === brand.toLowerCase()
     );
@@ -76,13 +81,16 @@ function filterProducts(parameters) {
 
   // Filter by max price
   if (price && price !== "") {
-    let max = parseInt(price);
-    results = results.filter((p) => p.price <= max);
+    let maxPrice = parseInt(price);
+    results = results.filter((p) => p.price <= maxPrice);
   }
 
   // Filter by features
-  if (features) {
-    results = results.filter((p) => p.features.includes(features));
+  if (features && features !== "") {
+    const featureLower = features.toLowerCase();
+    results = results.filter((p) =>
+      p.features.map((f) => f.toLowerCase()).includes(featureLower)
+    );
   }
 
   return results;
