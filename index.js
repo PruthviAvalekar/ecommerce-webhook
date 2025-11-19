@@ -5,7 +5,7 @@ const app = express();
 app.use(bodyParser.json());
 
 // ---------------------------
-// SAMPLE PRODUCT DATABASE
+// PRODUCT DATABASE
 // ---------------------------
 const products = [
   {
@@ -52,16 +52,71 @@ const products = [
   },
 ];
 
+// -----------------------------------------
+// NORMALIZATION FUNCTION (fix plural forms)
+// -----------------------------------------
+function normalizeCategory(category) {
+  if (!category) return "";
+
+  category = category.toLowerCase().trim();
+
+  // Convert plurals → singular
+  const pluralToSingular = {
+    mobiles: "mobile",
+    phones: "mobile", // "phones" should NOT be matched directly
+    phone: "mobile",
+    smartphones: "mobile",
+    smartphone: "mobile",
+
+    laptops: "laptop",
+    notebooks: "laptop",
+    pcs: "laptop",
+    pc: "laptop",
+
+    headphones: "headphones",
+    headphone: "headphones",
+    headsets: "headphones",
+    headset: "headphones",
+    earphones: "headphones",
+    earphone: "headphones",
+    earbuds: "headphones",
+    earbud: "headphones",
+
+    smartwatches: "smartwatch",
+    smartwatch: "smartwatch",
+    watches: "smartwatch",
+    watch: "smartwatch",
+
+    speakers: "speakers",
+    speaker: "speakers",
+
+    tablets: "tablet",
+    tabs: "tablet",
+    tab: "tablet",
+
+    cameras: "camera",
+    cam: "camera",
+    cams: "camera",
+    dslrs: "camera",
+    dslr: "camera",
+  };
+
+  return pluralToSingular[category] || category;
+}
+
 // ---------------------------
-// FIXED PRODUCT FILTER FUNCTION
+// FILTER FUNCTION (upgraded)
 // ---------------------------
 function filterProducts(parameters) {
   let { brand, category, price, features } = parameters;
 
-  // Dialogflow returns arrays → convert them to single values
+  // Extract first value from arrays
   if (Array.isArray(brand)) brand = brand[0];
   if (Array.isArray(category)) category = category[0];
   if (Array.isArray(features)) features = features[0];
+
+  // Normalize category (fix plurals)
+  category = normalizeCategory(category);
 
   let results = products;
 
@@ -81,15 +136,15 @@ function filterProducts(parameters) {
 
   // Filter by max price
   if (price && price !== "") {
-    let maxPrice = parseInt(price);
-    results = results.filter((p) => p.price <= maxPrice);
+    let max = parseInt(price);
+    results = results.filter((p) => p.price <= max);
   }
 
   // Filter by features
   if (features && features !== "") {
-    const featureLower = features.toLowerCase();
+    const f = features.toLowerCase();
     results = results.filter((p) =>
-      p.features.map((f) => f.toLowerCase()).includes(featureLower)
+      p.features.map((x) => x.toLowerCase()).includes(f)
     );
   }
 
@@ -97,7 +152,7 @@ function filterProducts(parameters) {
 }
 
 // ---------------------------
-// MAIN WEBHOOK ENDPOINT
+// MAIN WEBHOOK
 // ---------------------------
 app.post("/webhook", (req, res) => {
   const intentName = req.body.queryResult.intent.displayName;
@@ -112,7 +167,7 @@ app.post("/webhook", (req, res) => {
     if (results.length === 0) {
       return res.json({
         fulfillmentText:
-          "Sorry, I couldn't find any matching products. Try changing brand or price range.",
+          "Sorry, I couldn't find any matching products. Try changing brand, category, or price range.",
       });
     }
 
@@ -125,13 +180,14 @@ app.post("/webhook", (req, res) => {
     });
   }
 
-  // Default fallback response
   return res.json({
-    fulfillmentText: "I'm not sure how to handle that.",
+    fulfillmentText: "I'm not sure how to help with that.",
   });
 });
 
-// Start the server
+// ---------------------------
+// START SERVER
+// ---------------------------
 app.listen(3000, () => {
   console.log("Webhook server running on port 3000");
 });
