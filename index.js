@@ -4,9 +4,9 @@ const app = express();
 
 app.use(bodyParser.json());
 
-// ---------------------------
+// ------------------------------------
 // PRODUCT DATABASE
-// ---------------------------
+// ------------------------------------
 const products = [
   {
     name: "Samsung Galaxy S21",
@@ -52,142 +52,131 @@ const products = [
   },
 ];
 
-// -----------------------------------------
-// NORMALIZATION FUNCTION (fix plural forms)
-// -----------------------------------------
-function normalizeCategory(category) {
-  if (!category) return "";
+// ------------------------------------
+// NORMALIZATION FUNCTION
+// ------------------------------------
+function normalize(values) {
+  if (!values) return "";
 
-  category = category.toLowerCase().trim();
+  // Dialogflow sends arrays → convert to string
+  if (Array.isArray(values)) values = values[0];
 
-  // Convert plurals → singular
-  const pluralToSingular = {
+  if (!values) return "";
+
+  values = values.toLowerCase();
+
+  // CATEGORY NORMALIZATION
+  const categoryMap = {
     mobiles: "mobile",
-    phones: "mobile", // "phones" should NOT be matched directly
+    mobile: "mobile",
     phone: "mobile",
-    smartphones: "mobile",
+    phones: "mobile",
     smartphone: "mobile",
+    smartphones: "mobile",
 
+    laptop: "laptop",
     laptops: "laptop",
+    notebook: "laptop",
     notebooks: "laptop",
-    pcs: "laptop",
-    pc: "laptop",
 
-    headphones: "headphones",
     headphone: "headphones",
-    headsets: "headphones",
+    headphones: "headphones",
     headset: "headphones",
-    earphones: "headphones",
+    headsets: "headphones",
     earphone: "headphones",
+    earphones: "headphones",
     earbuds: "headphones",
     earbud: "headphones",
 
-    smartwatches: "smartwatch",
-    smartwatch: "smartwatch",
-    watches: "smartwatch",
-    watch: "smartwatch",
+    tablet: "tablet",
+    tablets: "tablet",
+    tab: "tablet",
+    tabs: "tablet",
+
+    camera: "camera",
+    cameras: "camera",
+    dslr: "camera",
+    dslrs: "camera",
+    cam: "camera",
+    cams: "camera",
 
     speakers: "speakers",
     speaker: "speakers",
-
-    tablets: "tablet",
-    tabs: "tablet",
-    tab: "tablet",
-
-    cameras: "camera",
-    cam: "camera",
-    cams: "camera",
-    dslrs: "camera",
-    dslr: "camera",
+    sound: "speakers",
+    soundsystem: "speakers",
   };
 
-  return pluralToSingular[category] || category;
+  return categoryMap[values] || values;
 }
 
-// ---------------------------
-// FILTER FUNCTION (upgraded)
-// ---------------------------
+// ------------------------------------
+// FILTER PRODUCTS
+// ------------------------------------
 function filterProducts(parameters) {
-  let { brand, category, price, features } = parameters;
-
-  // Extract first value from arrays
-  if (Array.isArray(brand)) brand = brand[0];
-  if (Array.isArray(category)) category = category[0];
-  if (Array.isArray(features)) features = features[0];
-
-  // Normalize category (fix plurals)
-  category = normalizeCategory(category);
+  let brand = normalize(parameters.brand);
+  let category = normalize(parameters.category);
+  let price = parameters.price ? parameters.price[0] : "";
+  let features = normalize(parameters.features);
 
   let results = products;
 
-  // Filter by category
-  if (category && category !== "") {
+  if (category) {
     results = results.filter(
       (p) => p.category.toLowerCase() === category.toLowerCase()
     );
   }
 
-  // Filter by brand
-  if (brand && brand !== "") {
+  if (brand) {
     results = results.filter(
       (p) => p.brand.toLowerCase() === brand.toLowerCase()
     );
   }
 
-  // Filter by max price
-  if (price && price !== "") {
+  if (price) {
     let max = parseInt(price);
     results = results.filter((p) => p.price <= max);
   }
 
-  // Filter by features
-  if (features && features !== "") {
-    const f = features.toLowerCase();
+  if (features) {
     results = results.filter((p) =>
-      p.features.map((x) => x.toLowerCase()).includes(f)
+      p.features.map((f) => f.toLowerCase()).includes(features)
     );
   }
 
   return results;
 }
 
-// ---------------------------
-// MAIN WEBHOOK
-// ---------------------------
+// ------------------------------------
+// WEBHOOK ENDPOINT
+// ------------------------------------
 app.post("/webhook", (req, res) => {
-  const intentName = req.body.queryResult.intent.displayName;
+  const intent = req.body.queryResult.intent.displayName;
   const parameters = req.body.queryResult.parameters;
 
-  console.log("Intent:", intentName);
+  console.log("Intent:", intent);
   console.log("Parameters:", parameters);
 
-  if (intentName === "search_product") {
+  if (intent === "search_product") {
     const results = filterProducts(parameters);
 
     if (results.length === 0) {
       return res.json({
         fulfillmentText:
-          "Sorry, I couldn't find any matching products. Try changing brand, category, or price range.",
+          "Sorry, I couldn't find any matching products. Try changing brand or price range.",
       });
     }
 
-    const productList = results
-      .map((p) => `${p.name} (₹${p.price})`)
-      .join(", ");
+    const list = results.map((p) => `${p.name} (₹${p.price})`).join(", ");
 
     return res.json({
-      fulfillmentText: `Here are some products you may like: ${productList}`,
+      fulfillmentText: `Here are some products you may like: ${list}`,
     });
   }
 
-  return res.json({
-    fulfillmentText: "I'm not sure how to help with that.",
-  });
+  res.json({ fulfillmentText: "I didn't understand that." });
 });
 
-// ---------------------------
-// START SERVER
-// ---------------------------
-app.listen(3000, () => {
-  console.log("Webhook server running on port 3000");
-});
+// ------------------------------------
+// SERVER START
+// ------------------------------------
+app.listen(3000, () => console.log("Webhook running on port 3000"));
