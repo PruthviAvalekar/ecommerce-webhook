@@ -4,16 +4,24 @@ const app = express();
 
 app.use(bodyParser.json());
 
-// ------------------------------------
-// PRODUCT DATABASE
-// ------------------------------------
+// -----------------------------------------------
+// PRODUCT DATABASE (EXTENDED)
+// -----------------------------------------------
 const products = [
+  // Mobiles
   {
     name: "Samsung Galaxy S21",
     brand: "Samsung",
     category: "mobile",
     price: 45000,
-    features: ["AMOLED", "5G"],
+    features: ["5G", "AMOLED"],
+  },
+  {
+    name: "Samsung A52",
+    brand: "Samsung",
+    category: "mobile",
+    price: 26000,
+    features: ["AMOLED"],
   },
   {
     name: "iPhone 13",
@@ -22,6 +30,8 @@ const products = [
     price: 60000,
     features: ["OLED"],
   },
+
+  // Laptops
   {
     name: "HP Pavilion 15",
     brand: "HP",
@@ -37,6 +47,31 @@ const products = [
     features: ["SSD"],
   },
   {
+    name: "Asus VivoBook 14",
+    brand: "Asus",
+    category: "laptop",
+    price: 43000,
+    features: ["SSD"],
+  },
+
+  // Tablets
+  {
+    name: "Samsung Tab A7",
+    brand: "Samsung",
+    category: "tablet",
+    price: 21000,
+    features: ["WiFi"],
+  },
+  {
+    name: "iPad 9th Gen",
+    brand: "Apple",
+    category: "tablet",
+    price: 30000,
+    features: ["Retina"],
+  },
+
+  // Headphones
+  {
     name: "Boat Airdopes 141",
     brand: "Boat",
     category: "headphones",
@@ -50,133 +85,180 @@ const products = [
     price: 24000,
     features: ["Bluetooth", "noise cancelling"],
   },
+
+  // Smartwatch
+  {
+    name: "Boat Xtend Smartwatch",
+    brand: "Boat",
+    category: "smartwatch",
+    price: 3000,
+    features: ["Bluetooth"],
+  },
+  {
+    name: "Apple Watch SE",
+    brand: "Apple",
+    category: "smartwatch",
+    price: 28000,
+    features: ["Heart rate"],
+  },
+
+  // Speakers
+  {
+    name: "JBL Flip 5",
+    brand: "JBL",
+    category: "speakers",
+    price: 9000,
+    features: ["Bass"],
+  },
+  {
+    name: "Boat Stone 350",
+    brand: "Boat",
+    category: "speakers",
+    price: 1800,
+    features: ["Bluetooth"],
+  },
+
+  // Cameras
+  {
+    name: "Canon EOS 1500D",
+    brand: "Canon",
+    category: "camera",
+    price: 38000,
+    features: ["DSLR"],
+  },
+  {
+    name: "Sony A6100",
+    brand: "Sony",
+    category: "camera",
+    price: 60000,
+    features: ["Mirrorless"],
+  },
 ];
 
-// ------------------------------------
-// NORMALIZATION FUNCTION
-// ------------------------------------
-function normalize(values) {
-  if (!values) return "";
+// -----------------------------------------------
+// CATEGORY NORMALIZATION (BASED ON YOUR ENTITY)
+// -----------------------------------------------
+const CATEGORY_MAP = {
+  mobile: ["phone", "phones", "mobile", "mobiles", "smartphone", "smartphones"],
+  laptop: ["laptop", "laptops", "pc", "pcs", "notebook", "notebooks"],
+  headphones: [
+    "headphones",
+    "earphones",
+    "headset",
+    "headsets",
+    "earbud",
+    "earbuds",
+    "airpods",
+    "airpod",
+  ],
+  smartwatch: [
+    "smartwatch",
+    "smartwatches",
+    "watch",
+    "watches",
+    "smartbands",
+    "smartband",
+  ],
+  speakers: ["speaker", "speakers", "sound system"],
+  tablet: ["tablet", "tablets", "tab", "tabs"],
+  camera: ["camera", "cameras", "dslr", "dslrs", "cam", "cams"],
+};
 
-  // Dialogflow sends arrays → convert to string
-  if (Array.isArray(values)) values = values[0];
+function normalizeCategory(cat) {
+  if (!cat) return "";
 
-  if (!values) return "";
+  cat = cat.toLowerCase();
 
-  values = values.toLowerCase();
+  for (const key in CATEGORY_MAP) {
+    if (CATEGORY_MAP[key].includes(cat)) {
+      return key;
+    }
+  }
 
-  // CATEGORY NORMALIZATION
-  const categoryMap = {
-    mobiles: "mobile",
-    mobile: "mobile",
-    phone: "mobile",
-    phones: "mobile",
-    smartphone: "mobile",
-    smartphones: "mobile",
-
-    laptop: "laptop",
-    laptops: "laptop",
-    notebook: "laptop",
-    notebooks: "laptop",
-
-    headphone: "headphones",
-    headphones: "headphones",
-    headset: "headphones",
-    headsets: "headphones",
-    earphone: "headphones",
-    earphones: "headphones",
-    earbuds: "headphones",
-    earbud: "headphones",
-
-    tablet: "tablet",
-    tablets: "tablet",
-    tab: "tablet",
-    tabs: "tablet",
-
-    camera: "camera",
-    cameras: "camera",
-    dslr: "camera",
-    dslrs: "camera",
-    cam: "camera",
-    cams: "camera",
-
-    speakers: "speakers",
-    speaker: "speakers",
-    sound: "speakers",
-    soundsystem: "speakers",
-  };
-
-  return categoryMap[values] || values;
+  return cat; // fallback if new category added
 }
 
-// ------------------------------------
-// FILTER PRODUCTS
-// ------------------------------------
+function normalizeBrand(br) {
+  if (!br) return "";
+  return br.toLowerCase();
+}
+
+function normalizeFeature(f) {
+  if (!f) return "";
+  return f.toLowerCase();
+}
+
+// -----------------------------------------------
+// PRODUCT FILTER FUNCTION
+// -----------------------------------------------
 function filterProducts(parameters) {
-  let brand = normalize(parameters.brand);
-  let category = normalize(parameters.category);
-  let price = parameters.price ? parameters.price[0] : "";
-  let features = normalize(parameters.features);
+  let { brand, category, price, features } = parameters;
+
+  // unwrap arrays from Dialogflow
+  brand = brand?.[0] || "";
+  category = category?.[0] || "";
+  price = price?.[0] || "";
+  features = features?.[0] || "";
+
+  // Normalize
+  category = normalizeCategory(category);
+  brand = normalizeBrand(brand);
+  features = normalizeFeature(features);
 
   let results = products;
 
   if (category) {
-    results = results.filter(
-      (p) => p.category.toLowerCase() === category.toLowerCase()
-    );
+    results = results.filter((p) => p.category.toLowerCase() === category);
   }
 
   if (brand) {
-    results = results.filter(
-      (p) => p.brand.toLowerCase() === brand.toLowerCase()
-    );
+    results = results.filter((p) => p.brand.toLowerCase() === brand);
   }
 
   if (price) {
-    let max = parseInt(price);
-    results = results.filter((p) => p.price <= max);
+    results = results.filter((p) => p.price <= parseInt(price));
   }
 
   if (features) {
     results = results.filter((p) =>
-      p.features.map((f) => f.toLowerCase()).includes(features)
+      p.features.map((x) => x.toLowerCase()).includes(features)
     );
   }
 
   return results;
 }
 
-// ------------------------------------
-// WEBHOOK ENDPOINT
-// ------------------------------------
+// -----------------------------------------------
+// MAIN WEBHOOK ENDPOINT
+// -----------------------------------------------
 app.post("/webhook", (req, res) => {
-  const intent = req.body.queryResult.intent.displayName;
+  const intentName = req.body.queryResult.intent.displayName;
   const parameters = req.body.queryResult.parameters;
 
-  console.log("Intent:", intent);
+  console.log("Intent:", intentName);
   console.log("Parameters:", parameters);
 
-  if (intent === "search_product") {
+  if (intentName === "search_product") {
     const results = filterProducts(parameters);
 
     if (results.length === 0) {
       return res.json({
         fulfillmentText:
-          "Sorry, I couldn't find any matching products. Try changing brand or price range.",
+          "Sorry, I couldn't find any matching products. Try changing brand, category, or price range.",
       });
     }
 
-    const list = results.map((p) => `${p.name} (₹${p.price})`).join(", ");
+    const productList = results
+      .map((p) => `${p.name} (₹${p.price})`)
+      .join(", ");
 
     return res.json({
-      fulfillmentText: `Here are some products you may like: ${list}`,
+      fulfillmentText: `Here are some products you may like: ${productList}`,
     });
   }
 
-  res.json({ fulfillmentText: "I didn't understand that." });
+  return res.json({ fulfillmentText: "I'm not sure how to handle that." });
 });
 
-// ------------------------------------
-// SERVER START
-// ------------------------------------
-app.listen(3000, () => console.log("Webhook running on port 3000"));
+// -----------------------------------------------
+app.listen(3000, () => console.log("Webhook server running on port 3000"));
